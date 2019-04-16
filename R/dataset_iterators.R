@@ -172,6 +172,22 @@ out_of_range_handler <- function(e) {
     stop(e$message, call. = FALSE)
 }
 
+#' Creates an iterator that works with `flowery`.
+#'
+#' @param x a tf dataset object.
+#'
+#' @export
+make_dataset_iterator <- function(x) {
+  flowery::generator({
+    it <- reticulate::as_iterator(x)
+    nxt <- reticulate::iter_next(it)
+    while(!is.null(nxt)) {
+      flowery::yield(nxt)
+      nxt <- reticulate::iter_next(it)
+    }
+  })
+}
+
 
 
 
