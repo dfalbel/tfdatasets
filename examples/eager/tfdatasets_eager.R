@@ -14,12 +14,11 @@ record_spec <- sql_record_spec(
 dataset <- sqlite_dataset('examples/eager/mtcars.sqlite3', 'select * from mtcars', record_spec) %>%
   dataset_batch(10)
 
-
-iter <- make_dataset_iterator(dataset)
-
-flowery::iterate(for(x in iter) {
-  print(str(x))
-})
+flowery::iterate(
+  for(x in make_dataset_iterator(dataset)) {
+    print(str(x))
+  }
+)
 
 
 
