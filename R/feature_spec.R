@@ -575,15 +575,19 @@ StepCategoricalColumnWithVocabularyList <- R6::R6Class(
       if (is.null(self$vocabulary_list)) {
         values <- batch[[self$key]]
 
-        # add shape to tensor with no shape
-        if (identical(values$shape$as_list(), list()))
-          values <- tf$constant(values, shape = 1L)
+        if (inherits(values, "tensorflow.tensor")) {
 
-        # get unique values before converting to R.
-        values <- tensorflow::tf$unique(values)$y
+          # add shape to tensor with no shape
+          if (identical(values$shape$as_list(), list()))
+            values <- tf$constant(values, shape = 1L)
 
-        if (!is.atomic(values))
-          values <- values$numpy()
+          # get unique values before converting to R.
+          values <- tensorflow::tf$unique(values)$y
+
+          if (!is.atomic(values))
+            values <- values$numpy()
+
+        }
 
         # converts from bytes to an R string. Need in python >= 3.6
         # special case when values is a single value of type string
@@ -948,6 +952,34 @@ StepTextEmbeddingColumn <- R6::R6Class(
   )
 )
 
+
+# StepImageEmbedding ------------------------------------------------------
+
+StepImageEmbeddingColumn <- R6::R6Class(
+  "StepImageEmbeddingColumn",
+  inherit = Step,
+
+  public = list(
+
+    key = NULL,
+    module_spec = NULL,
+    name = NULL,
+
+    initialize = function(key, module_spec, name) {
+      self$key <- key
+      self$module_spec <- module_spec
+      self$name <- name
+    },
+
+    feature = function(base_features) {
+      tfhub::hub_image_embedding_column(
+        key = self$key,
+        module_spec = self$module_spec
+      )
+    }
+
+  )
+)
 
 # Wrappers ----------------------------------------------------------------
 
@@ -1743,12 +1775,48 @@ step_shared_embeddings_column <- function(spec, ..., dimension, combiner = "mean
 #'
 #' @export
 step_text_embedding_column <- function(spec, ..., module_spec, trainable = FALSE) {
-  args <- list(
-    module_spec = module_spec,
-    trainable = trainable
-  )
 
-  step_(spec, ..., step = StepTextEmbeddingColumn$new, args = args, prefix = "text_embedding")
+  spec <- spec$clone(deep = TRUE)
+  quos_ <- quos(...)
+
+  variables <- terms_select(spec$feature_names(), spec$feature_types(), quos_)
+  for (var in variables) {
+    stp <- StepTextEmbeddingColumn$new(
+      key = var,
+      module_spec = module_spec,
+      trainable = trainable,
+      name = var
+    )
+    spec$add_step(stp)
+  }
+
+  spec
+}
+
+#' Creates image embeddings columns
+#'
+#' Use this step to create image embeddings columns from image columns.
+#'
+#' @inheritParams step_numeric_column
+#' @param module_spec A string handle or a _ModuleSpec identifying the module.
+#'
+#' @export
+step_image_embedding_column <- function(spec, ..., module_spec) {
+
+  spec <- spec$clone(deep = TRUE)
+  quos_ <- quos(...)
+
+  variables <- terms_select(spec$feature_names(), spec$feature_types(), quos_)
+  for (var in variables) {
+    stp <- StepImageEmbeddingColumn$new(
+      key = var,
+      module_spec = module_spec,
+      name = var
+    )
+    spec$add_step(stp)
+  }
+
+  spec
 }
 
 # Input from spec ---------------------------------------------------------
